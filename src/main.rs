@@ -81,7 +81,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Feed Title: {}", channel.title());
 
         // Create a directory for the feed
-        let feed_directory = sanitize_filename(&channel.title());
+        let feed_directory = &channel.title();
         create_dir_all(&feed_directory)?;
 
         // Initialize the seen items for this feed if it doesn't exist
