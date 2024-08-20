@@ -5,7 +5,6 @@ use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
-use reqwest::blocking::get;
 use rss::Channel;
 use serde::{Deserialize, Serialize};
 
@@ -38,15 +37,12 @@ impl SeenItems {
 fn load_feed_urls(file_path: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let file = File::open(file_path)?;
     let reader = BufReader::new(file);
-    let urls: Vec<String> = reader
-        .lines()
-        .filter_map(Result::ok) // Filter out any errors
-        .collect();
+    let urls: Vec<String> = reader.lines().map_while(Result::ok).collect();
     Ok(urls)
 }
 
 fn download_file(url: &str, directory: &str) -> Result<(), Box<dyn Error>> {
-    let response = get(url)?;
+    let response = reqwest::blocking::get(url)?;
     let file_name = url.split('/').last().unwrap_or("downloaded_file");
     let file_path = Path::new(directory).join(file_name);
 
@@ -74,7 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Iterate over each feed URL
     for url in feed_urls {
         // Fetch the RSS feed
-        let response = get(&url)?.text()?;
+        let response = reqwest::blocking::get(&url)?.text()?;
         let channel = Channel::read_from(response.as_bytes())?;
 
         // Print the title of the feed
@@ -82,7 +78,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // Create a directory for the feed
         let feed_directory = &channel.title();
-        create_dir_all(&feed_directory)?;
+        create_dir_all(feed_directory)?;
 
         // Initialize the seen items for this feed if it doesn't exist
         let feed_seen_items = seen_items
@@ -95,7 +91,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let link = item.link().unwrap_or("No link").to_string();
             if !feed_seen_items.contains(&link) {
                 println!("New Item: {}", item.title().unwrap_or("No title"));
-                println!("Link: {}", link);
+                println!("Link: {link}");
                 println!(
                     "Description: {}",
                     item.description().unwrap_or("No description")
@@ -108,9 +104,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 // Check for external file links in the item
                 if let Some(enclosure) = item.enclosure() {
                     let file_url = enclosure.url();
-                    println!("Downloading file: {}", file_url);
-                    if let Err(e) = download_file(file_url, &feed_directory) {
-                        eprintln!("Failed to download file: {}", e);
+                    println!("Downloading file: {file_url}");
+                    if let Err(e) = download_file(file_url, feed_directory) {
+                        eprintln!("Failed to download file: {e}");
                     }
                 }
             }
